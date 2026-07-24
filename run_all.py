@@ -17,6 +17,9 @@
   5. figure4.py           - Fig4: 机制链条
   6. figure5.py           - Fig5: 外部队列验证
   7. figure_supplement.py - FigS1-S3: 补充图（数据集概览、敏感性分析、额外验证）
+  8. t05_bootstrap_sensitivity.py - Bootstrap内部验证 + 阈值敏感性分析
+  9. table1_baseline.py   - Table 1: 患者基线特征表
+ 10. recompute_5_metrics.py - 早期5项指标重新计算（T04 SEM/LUSC OR/CD8表达/T08 MWU/化疗n）
 
 使用：python3 run_all.py
 """
@@ -46,6 +49,8 @@ steps = [
     {'name': 'T05 Step 2+3: Bootstrap 1000 + 阈值敏感性', 'script': 't05_bootstrap_sensitivity.py',
      'depends': []},
     {'name': 'Step 4: Table 1 患者基线特征表', 'script': 'table1_baseline.py',
+     'depends': []},
+    {'name': 'Recompute: 早期5项指标重新计算', 'script': 'recompute_5_metrics.py',
      'depends': []},
 ]
 
