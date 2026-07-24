@@ -4,22 +4,20 @@
 目录结构：
   data/
     adata/      - 数据文件（h5ad, csv, txt等）
-    code/       - 分析代码（7个脚本）
+    code/       - 分析代码（8个分析脚本 + 2个工具模块）
     result/     - 输出结果（图表、CSV）
     run_all.py  - 本文件
     台账.md     - 分析台账
 
 运行顺序：
   1. figure1.py           - Fig1: 单细胞图谱与NK-like细胞特征
-  2. figure2.py           - Fig2: 克隆命运锁定预测响应
+  2. figure2.py           - Fig2: 克隆命运锁定预测响应（含Bootstrap+阈值敏感性）
   3. spatial_validation.py - Spatial: 空间转录组验证
   4. figure3.py           - Fig3: 髓系微环境与SPP1+ TAM
   5. figure4.py           - Fig4: 机制链条
   6. figure5.py           - Fig5: 外部队列验证
-  7. figure_supplement.py - FigS1-S3: 补充图（数据集概览、敏感性分析、额外验证）
-  8. t05_bootstrap_sensitivity.py - Bootstrap内部验证 + 阈值敏感性分析
-  9. table1_baseline.py   - Table 1: 患者基线特征表
- 10. recompute_5_metrics.py - 早期5项指标重新计算（T04 SEM/LUSC OR/CD8表达/T08 MWU/化疗n）
+  7. figure_supplement.py - FigS1-S3: 补充图
+  8. table1_baseline.py   - Table 1: 患者基线特征表
 
 使用：python3 run_all.py
 """
@@ -39,18 +37,14 @@ os.makedirs(ADATA, exist_ok=True)
 
 steps = [
     {'name': 'Fig1: 单细胞图谱与NK-like细胞特征', 'script': 'figure1.py', 'depends': []},
-    {'name': 'Fig2: 克隆命运锁定预测响应', 'script': 'figure2.py', 'depends': ['per_patient_metrics.csv']},
+    {'name': 'Fig2: 克隆命运锁定预测响应（含Bootstrap+阈值敏感性）', 'script': 'figure2.py', 'depends': ['per_patient_metrics.csv']},
     {'name': 'Spatial: 空间转录组验证', 'script': 'spatial_validation.py', 'depends': []},
     {'name': 'Fig3: 髓系微环境与SPP1+ TAM', 'script': 'figure3.py', 'depends': ['per_patient_metrics.csv', 'spatial_patient_scores.csv']},
     {'name': 'Fig4: 机制链条', 'script': 'figure4.py', 'depends': ['myeloid_per_patient.csv', 'per_patient_metrics.csv']},
     {'name': 'Fig5: 外部队列验证', 'script': 'figure5.py', 'depends': []},
-    {'name': 'FigS1-S3: 补充图（数据集概览/敏感性/额外验证）', 'script': 'figure_supplement.py',
+    {'name': 'FigS1-S3: 补充图', 'script': 'figure_supplement.py',
      'depends': ['per_patient_metrics.csv', 'sig_GSE135222.csv', 'fig5_gene_match.csv']},
-    {'name': 'T05 Step 2+3: Bootstrap 1000 + 阈值敏感性', 'script': 't05_bootstrap_sensitivity.py',
-     'depends': []},
-    {'name': 'Step 4: Table 1 患者基线特征表', 'script': 'table1_baseline.py',
-     'depends': []},
-    {'name': 'Recompute: 早期5项指标重新计算', 'script': 'recompute_5_metrics.py',
+    {'name': 'Table 1: 患者基线特征表', 'script': 'table1_baseline.py',
      'depends': []},
 ]
 
