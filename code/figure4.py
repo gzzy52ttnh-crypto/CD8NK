@@ -93,12 +93,13 @@ name_to_pos = {n: i for i, n in enumerate(obs_names)}
 for pid, sub in t_sample.obs.groupby('sampleID'):
     if pid not in high_spp1 and pid not in low_spp1:
         continue
-    cd8p = sub[sub['is_cd8']]
-    if len(cd8p) == 0:
+    nkp = sub[sub['is_nklike']]
+    if len(nkp) == 0:
         continue
-    cells_pos = [name_to_pos[n] for n in cd8p.index]
+    cells_pos = [name_to_pos[n] for n in nkp.index]
     subX = t_logX_sample[cells_pos].toarray() if hasattr(t_logX_sample[cells_pos], 'toarray') else np.asarray(t_logX_sample[cells_pos])
-    r = {'patient': pid, 'group': 'High SPP1+ TAM' if pid in high_spp1 else 'Low SPP1+ TAM'}
+    r = {'patient': pid, 'group': 'High SPP1+ TAM' if pid in high_spp1 else 'Low SPP1+ TAM',
+         'n_nklike_cells': len(nkp)}
     for g in stem_present:
         gi = list(t_sample.var_names).index(g)
         r[g] = float(subX[:, gi].mean())

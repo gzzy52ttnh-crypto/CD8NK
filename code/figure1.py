@@ -219,7 +219,7 @@ box_data = [pcr_vals, nonmpr_vals]
 box_labels = [f'pCR\n(n={len(pcr_vals)})', f'non-MPR\n(n={len(nonmpr_vals)})']
 box_colors = ['#E74C3C', '#3498DB']
 
-bp = ax4.boxplot(box_data, labels=box_labels, patch_artist=True, widths=0.6,
+bp = ax4.boxplot(box_data, tick_labels=box_labels, patch_artist=True, widths=0.6,
                  medianprops=dict(color='black', linewidth=1.5))
 for patch, color in zip(bp['boxes'], box_colors):
     patch.set_facecolor(color)

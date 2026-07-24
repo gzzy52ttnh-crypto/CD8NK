@@ -10,6 +10,7 @@ Spatial validation — GSE221733 DSP (GeoMx) NSCLC immunotherapy cohort
 """
 import os, sys, gzip
 import numpy as np, pandas as pd, scipy.stats as ss
+from statsmodels.stats.multitest import multipletests
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 import matplotlib; matplotlib.use('Agg')
@@ -661,7 +662,39 @@ stats = dict(
     # 四分组
     fourgroup_stem_highhigh_vs_lowlow_p = mw_4g.pvalue,
 )
-pd.Series(stats).to_csv(os.path.join(RESULT, 'spatial_stats.csv'))
+
+# ---- 多重校正（BH-FDR） ----
+p_list = []
+p_keys = []
+for col, mw in comp_results.items():
+    p_list.append(mw.pvalue)
+    p_keys.append(f'response_{col}_p')
+for col, (r, p) in corr_results.items():
+    p_list.append(p)
+    p_keys.append(f'corr_{col}_p')
+for col, (r, p) in tumor_corr.items():
+    p_list.append(p)
+    p_keys.append(f'tumor_corr_{col}_p')
+p_list.append(wc_stem.pvalue)
+p_keys.append('intrapatient_stem_p')
+p_list.append(wc_nk.pvalue)
+p_keys.append('intrapatient_nkcyto_p')
+p_list.append(mw_4g.pvalue)
+p_keys.append('fourgroup_stem_p')
+
+_, fdr_vals, _, _ = multipletests(p_list, method='fdr_bh')
+fdr_dict = dict(zip(p_keys, fdr_vals))
+print(f'\nFDR correction (BH): {len(p_list)} tests', flush=True)
+for key, p, f in zip(p_keys, p_list, fdr_vals):
+    sig = '*' if f < 0.05 else ''
+    print(f'  {key}: p={p:.4f}, FDR={f:.4f} {sig}', flush=True)
+
+# 在 stats 中添加 FDR 列
+for key, fdr_val in fdr_dict.items():
+    stats[key.replace('_p', '_fdr')] = fdr_val
+
+stats_s = pd.Series(stats)
+stats_s.to_csv(os.path.join(RESULT, 'spatial_stats.csv'))
 sig_df.to_csv(os.path.join(RESULT, 'spatial_roi_scores.csv'), index=False)
 pt_df.to_csv(os.path.join(RESULT, 'spatial_patient_scores.csv'), index=False)
 if len(intra_df) >= 1:

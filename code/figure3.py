@@ -112,9 +112,11 @@ for pid, sub in m.obs.groupby('sampleID'):
     resp = sub['pathological_response'].iloc[0]
     if resp not in ('pCR','non-MPR'):
         continue
-    tot = len(sub); sp = int(sub['is_spp1_tam'].sum())
-    frac = sp/tot if tot > 0 else np.nan
-    rows.append(dict(patient=pid, response=resp, myeloid=tot, spp1_tam=sp, spp1_tam_frac=frac))
+    mac_sub = sub[sub['sub_cell_type'].str.contains('Mφ|Mac|Mono', regex=True, na=False)]
+    tot_mac = len(mac_sub)
+    sp = int(mac_sub['is_spp1_tam'].sum())
+    frac = sp/tot_mac if tot_mac > 0 else np.nan
+    rows.append(dict(patient=pid, response=resp, myeloid=len(sub), mac_mono=tot_mac, spp1_tam=sp, spp1_tam_frac=frac))
 mpdf = pd.DataFrame(rows)
 mpdf['resp_bin'] = (mpdf['response']=='pCR').astype(int)
 mpdf.to_csv(os.path.join(RESULT,'myeloid_per_patient.csv'), index=False)
@@ -443,8 +445,9 @@ print('Fig3 saved to result/Fig3_myeloid.png', flush=True)
 # ============= 保存统计 =============
 stats = dict(
     n_myeloid_cells = int(m.n_obs),
+    n_mac_mono = int(mac_mask.sum()),
     n_spp1_tam = int(ist.sum()),
-    spp1_tam_frac = float(ist.mean()),
+    spp1_tam_frac = float(ist.sum() / mac_mask.sum()) if mac_mask.sum() > 0 else 0.0,
     mwu_p = mw.pvalue,
     median_spp1_nonMPR = g0.median(),
     median_spp1_pCR = g1.median(),

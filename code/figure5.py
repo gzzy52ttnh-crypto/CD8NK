@@ -109,9 +109,24 @@ print(f'GSE91061 matched {len(r3)}/24 genes (n={m3.shape[1]}, Pre R/NR={len(gse9
 
 # ============= 加载 GSE120575 scRNA-seq =============
 print('=== Loading GSE120575 (melanoma scRNA-seq) ===', flush=True)
+
+# NK-like 签名基因列表（24个，与其他队列一致）
+GSE120575_SIGNATURE_GENES = [
+    'FGFBP2','KLRD1','CX3CR1','FCGR3A','KLRC1','KLRC2','KLRB1','NKG7',
+    'GNLY','PRF1','GZMB','GZMH','GZMA','CTSW','KLRF1','SH2D1B','TYROBP',
+    'FCER1G','CD160','CRTAM','IFNG','TBX21','EOMES','ZNF683'
+]
+
 nk_file = os.path.join(ADATA, 'GSE120575', 'GSE120575_nk_genes.csv')
 m4 = pd.read_csv(nk_file, index_col=0)
-print(f'GSE120575 NK genes: {list(m4.index)}, cells: {m4.shape[1]}', flush=True)
+csv_genes = set(m4.index)
+sig_genes_set = set(GSE120575_SIGNATURE_GENES)
+assert csv_genes == sig_genes_set, (
+    f'GSE120575基因集不一致！CSV有{len(csv_genes)}个，签名有{len(sig_genes_set)}个。'
+    f'差异：CSV-only={csv_genes - sig_genes}, sig-only={sig_genes_set - csv_genes}'
+)
+print(f'GSE120575 NK signature genes ({len(csv_genes)}): {sorted(csv_genes)}', flush=True)
+print(f'GSE120575 cells: {m4.shape[1]}', flush=True)
 
 # 患者响应映射
 pred_file = os.path.join(ADATA, 'GSE120575', 'GSE120575_Patient_Predictions.csv')
@@ -313,7 +328,7 @@ ax3 = fig.add_subplot(gs[1:, :])
 ax3.set_xlim(0, 14)
 ax3.set_ylim(0, 8)
 ax3.axis('off')
-ax3.set_title('Cross-cancer Heterogeneity Model: Response Bottleneck', fontsize=14, fontweight='bold')
+ax3.set_title('Conceptual Model: Cross-cancer Response Bottleneck (Hypothesis)', fontsize=14, fontweight='bold')
 
 # NSCLC (Cold tumor) 左侧
 box_nsclc = FancyBboxPatch((0.3, 1), 5.5, 6, boxstyle="round,pad=0.15",
@@ -365,6 +380,12 @@ ax3.text(7, 4.5, 'Different\nbottlenecks', ha='center', fontsize=9, fontweight='
 ax3.text(7, 3.3, 'Cold vs Hot', ha='center', fontsize=8, color='#7D3C98', style='italic')
 
 ax3.text(-0.02, 1.0, 'C', transform=ax3.transAxes, fontsize=22, fontweight='bold')
+
+# 底部脚注：明确标注为概念模型
+ax3.text(7, 0.5,
+         'Conceptual model based on current data; not a direct data-driven discovery. '
+         'NSCLC validation: GSE126044/GSE135222; Melanoma validation: GSE91061/GSE120575',
+         ha='center', fontsize=8, color='#7F8C8D', style='italic')
 
 plt.tight_layout()
 plt.savefig(os.path.join(RESULT, 'Fig5_external_validation.png'), dpi=300)
