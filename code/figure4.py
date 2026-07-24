@@ -4,6 +4,7 @@ Figure 4 — 机制链条验证（分子层面）
   Panel A: 散点图 — SPP1+ TAM 比例 vs NK-Locked Ratio（颜色区分响应组）
   Panel B: 小提琴图 — High-SPP1 vs Low-SPP1 的 KLF2 等干性基因表达
   Panel C: 干性基因表达比较 — NK-like vs Tex 中 KLF2/TCF7/SELL
+  Panel D: ssGSEA 基因集富集 — Stemness/Exhaustion 得分在 High vs Low SPP1 组
 """
 import os, sys
 import numpy as np, pandas as pd, scipy.stats as ss
@@ -12,6 +13,7 @@ import matplotlib; matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
+import scanpy as sc
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -135,6 +137,63 @@ for g in panel_c_genes:
     nk_vs_tex_stats.append({'gene': g, 'pvalue': pu, 'mean_nklike': nk_expr.mean(), 'mean_tex': tex_expr.mean()})
 nk_vs_tex_df = pd.DataFrame(nk_vs_tex_stats)
 print(nk_vs_tex_df.to_string(), flush=True)
+
+# ============= Panel D: ssGSEA 基因集富集 =============
+print('=== ssGSEA: Stemness/Exhaustion gene sets ===', flush=True)
+
+STEMNESS_GENES = ['TCF7', 'LEF1', 'KLF2', 'IL7R', 'SELL', 'CCR7', 'CD27', 'BACH2', 'ID3', 'MYB']
+EXHAUSTION_GENES = ['TOX', 'PDCD1', 'HAVCR2', 'ENTPD1', 'LAG3', 'CTLA4', 'TIGIT', 'NR4A1', 'CXCL13', 'IFNG']
+
+# 在NK-like细胞中计算基因集得分（使用scanpy score_genes）
+nk_adata = t_sample[t_sample.obs['is_nklike']].copy()
+all_genes = set(nk_adata.var_names)
+
+stem_found = [g for g in STEMNESS_GENES if g in all_genes]
+exh_found = [g for g in EXHAUSTION_GENES if g in all_genes]
+print(f'Stemness: {len(stem_found)}/{len(STEMNESS_GENES)} genes present', flush=True)
+print(f'Exhaustion: {len(exh_found)}/{len(EXHAUSTION_GENES)} genes present', flush=True)
+
+sc.tl.score_genes(nk_adata, gene_list=stem_found, score_name='stemness_score', ctrl_size=min(50, nk_adata.n_vars))
+sc.tl.score_genes(nk_adata, gene_list=exh_found, score_name='exhaustion_score', ctrl_size=min(50, nk_adata.n_vars))
+
+# Per-patient aggregation
+ssgsea_rows = []
+for pid, sub in nk_adata.obs.groupby('sampleID'):
+    if pid not in high_spp1 and pid not in low_spp1:
+        continue
+    if len(sub) < 5:
+        continue
+    row = {
+        'patient': pid,
+        'group': 'High SPP1+ TAM' if pid in high_spp1 else 'Low SPP1+ TAM',
+        'n_nk_cells': len(sub),
+        'stemness_mean': float(nk_adata[sub.index].obs['stemness_score'].mean()),
+        'stemness_median': float(nk_adata[sub.index].obs['stemness_score'].median()),
+        'exhaustion_mean': float(nk_adata[sub.index].obs['exhaustion_score'].mean()),
+        'exhaustion_median': float(nk_adata[sub.index].obs['exhaustion_score'].median()),
+    }
+    ssgsea_rows.append(row)
+
+ssgsea_df = pd.DataFrame(ssgsea_rows)
+print(f'Patients with ssGSEA data: {len(ssgsea_df)}', flush=True)
+
+# MWU检验
+ssgsea_stats = []
+for score, direction in [('stemness_mean', 'Low > High'), ('exhaustion_mean', 'High > Low')]:
+    lo = ssgsea_df[ssgsea_df.group=='Low SPP1+ TAM'][score]
+    hi = ssgsea_df[ssgsea_df.group=='High SPP1+ TAM'][score]
+    p_val = ss.mannwhitneyu(lo, hi, alternative='two-sided').pvalue
+    ssgsea_stats.append({
+        'gene_set': score.replace('_mean', ''),
+        'p_value': p_val,
+        'mean_low': lo.mean(),
+        'mean_high': hi.mean(),
+        'direction': direction
+    })
+    print(f'  {score}: Low={lo.mean():.4f}, High={hi.mean():.4f}, p={p_val:.4f} ({direction})', flush=True)
+
+ssgsea_stats_df = pd.DataFrame(ssgsea_stats)
+
 
 # ============= 组合绘图 =============
 print('=== Composing Figure 4 ===', flush=True)
@@ -306,5 +365,7 @@ stats = dict(
 pd.Series(stats).to_csv(os.path.join(RESULT, 'fig4_stats.csv'))
 gene_stats_df.to_csv(os.path.join(RESULT, 'fig4_gene_stats.csv'), index=False)
 nk_vs_tex_df.to_csv(os.path.join(RESULT, 'fig4_nk_vs_tex_stats.csv'), index=False)
+ssgsea_df.to_csv(os.path.join(RESULT, 'fig4_ssgsea_per_patient.csv'), index=False)
+ssgsea_stats_df.to_csv(os.path.join(RESULT, 'fig4_ssgsea_stats.csv'), index=False)
 
 print('=== DONE Fig4 ===', flush=True)

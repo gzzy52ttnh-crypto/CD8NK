@@ -23,7 +23,7 @@ result/
 *.docx
 *.doc
 *.pdf
-*.md
+!台账.md
 
 # IDE
 .DS_Store
