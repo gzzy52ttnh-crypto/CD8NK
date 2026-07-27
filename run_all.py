@@ -1,119 +1,103 @@
 #!/usr/bin/env python3
 """
-一键运行全部分析流程
-目录结构：
-  data/
-    adata/      - 数据文件（h5ad, csv, txt等）
-    code/       - 分析代码（8个分析脚本 + 2个工具模块）
-    result/     - 输出结果（图表、CSV）
-    run_all.py  - 本文件
-    台账.md     - 分析台账
-
-运行顺序：
-  1. figure1.py           - Fig1: 单细胞图谱与NK-like细胞特征
-  2. figure2.py           - Fig2: 克隆命运锁定预测响应（含Bootstrap+阈值敏感性）
-  3. spatial_validation.py - Spatial: 空间转录组验证
-  4. figure3.py           - Fig3: 髓系微环境与SPP1+ TAM
-  5. figure4.py           - Fig4: 机制链条
-  6. figure5.py           - Fig5: 外部队列验证
-  7. figure_supplement.py - FigS1-S3: 补充图
-  8. table1_baseline.py   - Table 1: 患者基线特征表
-
-使用：python3 run_all.py
+一键运行 NK-like CD8+ T 细胞 NSCLC 抗 PD-1 全部分析流程
+所有 18 个步骤按依赖顺序串行执行，固定使用 /opt/anaconda3/bin/python3 环境。
 """
-import os
 import subprocess
 import sys
+import os
+from pathlib import Path
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-CODE = os.path.join(HERE, 'code')
-RESULT = os.path.join(HERE, 'result')
-ADATA = os.path.join(HERE, 'adata')
+ROOT = Path(__file__).resolve().parent
+CODE_DIR = ROOT / 'code'
+RESULT_DIR = ROOT / 'result'
+LOG_DIR = RESULT_DIR
 
-PYTHON = sys.executable
+PYTHON = '/opt/anaconda3/bin/python3'
 
-os.makedirs(RESULT, exist_ok=True)
-os.makedirs(ADATA, exist_ok=True)
-
-steps = [
-    {'name': 'Fig1: 单细胞图谱与NK-like细胞特征', 'script': 'figure1.py', 'depends': []},
-    {'name': 'Fig2: 克隆命运锁定预测响应（含Bootstrap+阈值敏感性）', 'script': 'figure2.py', 'depends': ['per_patient_metrics.csv']},
-    {'name': 'Spatial: 空间转录组验证', 'script': 'spatial_validation.py', 'depends': []},
-    {'name': 'Fig3: 髓系微环境与SPP1+ TAM', 'script': 'figure3.py', 'depends': ['per_patient_metrics.csv', 'spatial_patient_scores.csv']},
-    {'name': 'Fig4: 机制链条', 'script': 'figure4.py', 'depends': ['myeloid_per_patient.csv', 'per_patient_metrics.csv']},
-    {'name': 'Fig5: 外部队列验证', 'script': 'figure5.py', 'depends': []},
-    {'name': 'FigS1-S3: 补充图', 'script': 'figure_supplement.py',
-     'depends': ['per_patient_metrics.csv', 'sig_GSE135222.csv', 'fig5_gene_match.csv']},
-    {'name': 'Table 1: 患者基线特征表', 'script': 'table1_baseline.py',
-     'depends': []},
+STEPS = [
+    {'name': 'Step 1 现象发现', 'script': 'step1_phenomenon_discovery.py', 'depends': []},
+    {'name': 'Step 2 核心指标构建', 'script': 'step2_core_index_construction.py', 'depends': []},
+    {'name': 'Step 2 Firth 惩罚回归验证', 'script': 'step2_firth_validation.py', 'depends': ['step2_core_index_construction.py']},
+    {'name': 'Step 2.5 空间转录组验证', 'script': 'step2_5_spatial_validation.py', 'depends': []},
+    {'name': 'Step 3 机制探索', 'script': 'step3_mechanism_exploration.py', 'depends': ['step2_core_index_construction.py']},
+    {'name': 'Step 3b TCF7 杀伤功能失调', 'script': 'step3b_tcf7_dysfunction.py', 'depends': ['step3_mechanism_exploration.py']},
+    {'name': 'Step 4 证据拓展', 'script': 'step4_evidence_generalization.py', 'depends': ['step2_core_index_construction.py', 'step2_5_spatial_validation.py']},
+    {'name': 'Step 4-5 外部队列深度验证', 'script': 'step4_5_external_validation.py', 'depends': ['step2_core_index_construction.py']},
+    {'name': 'Step 4b 化疗动力学 (GSE179994)', 'script': 'step4b_chemo_dynamics.py', 'depends': []},
+    {'name': 'Step 4c 主队列化疗方案分层', 'script': 'step4c_chemo_stratified.py', 'depends': ['step2_core_index_construction.py']},
+    {'name': 'Step 4d 化疗机制深度', 'script': 'step4d_chemo_mechanism.py', 'depends': ['step2_core_index_construction.py', 'step3_mechanism_exploration.py']},
+    {'name': 'Step 4e cDC2 抗原呈递', 'script': 'step4e_cdc2_mechanism.py', 'depends': ['step3_mechanism_exploration.py']},
+    {'name': 'Step 5 临床转化模型', 'script': 'step5_clinical_translation.py', 'depends': ['step2_core_index_construction.py']},
+    {'name': 'Step 5.5 IRS 评分构建', 'script': 'step5_5_IRS_construction.py', 'depends': ['step2_core_index_construction.py', 'step3_mechanism_exploration.py']},
+    {'name': 'Step 6 GSE241934 外部验证', 'script': 'step6_gse241934_validation.py', 'depends': []},
+    {'name': 'Step 6c TCR 克隆分析', 'script': 'step6c_tcr_clonality.py', 'depends': ['step6_gse241934_validation.py']},
+    {'name': 'Step 6d 机制验证 (GSE241934)', 'script': 'step6d_mechanism_validation.py', 'depends': ['step6_gse241934_validation.py']},
+    {'name': 'Step 6e 克隆多样性 (GSE241934+GSE179994)', 'script': 'step6e_tcr_diversity.py', 'depends': ['step6_gse241934_validation.py', 'step4b_chemo_dynamics.py']},
 ]
 
-def check_dependencies(deps):
-    for dep in deps:
-        path = os.path.join(RESULT, dep)
-        if not os.path.exists(path):
-            return False, dep
-    return True, None
 
-def run_script(name, script):
-    print(f"\n{'='*60}", flush=True)
-    print(f"正在运行: {name}", flush=True)
-    print(f"脚本: {script}", flush=True)
-    print('='*60, flush=True)
-    
-    script_path = os.path.join(CODE, script)
-    log_path = os.path.join(RESULT, f'{script.replace(".py", "")}.log')
-    
-    env = os.environ.copy()
-    env['PYTHONDONTWRITEBYTECODE'] = '1'
-    
-    with open(log_path, 'w') as log:
-        proc = subprocess.run(
-            [PYTHON, script_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
+def run_step(idx, step):
+    """执行单个步骤"""
+    script = CODE_DIR / step['script']
+    log_file = LOG_DIR / f"{step['script'].replace('.py', '')}.log"
+    print(f"\n[{idx+1}/{len(STEPS)}] {step['name']}")
+    print(f"   Script: {step['script']}")
+    print(f"   Log: {log_file.name}")
+    try:
+        result = subprocess.run(
+            [PYTHON, str(script)],
+            cwd=str(ROOT),
+            capture_output=True,
             text=True,
-            env=env,
-            timeout=None
+            timeout=3600
         )
-        log.write(proc.stdout)
-        print(proc.stdout, flush=True)
-    
-    print(f"\n{'='*60}", flush=True)
-    print(f"退出码: {proc.returncode}", flush=True)
-    print('='*60, flush=True)
-    
-    return proc.returncode == 0
+        with open(log_file, 'w', encoding='utf-8') as f:
+            f.write(f"=== STDOUT ===\n{result.stdout}\n=== STDERR ===\n{result.stderr}\n=== EXIT CODE: {result.returncode} ===\n")
+        if result.returncode == 0:
+            print(f"   OK (exit 0)")
+            return True
+        else:
+            print(f"   FAILED (exit {result.returncode})")
+            print(f"   STDERR (last 500 chars): {result.stderr[-500:]}")
+            return False
+    except subprocess.TimeoutExpired:
+        print(f"   TIMEOUT (3600s)")
+        return False
+    except Exception as e:
+        print(f"   ERROR: {e}")
+        return False
+
 
 def main():
-    print(f"数据分析目录: {HERE}", flush=True)
-    print(f"Python路径: {PYTHON}", flush=True)
-    print(f"步骤总数: {len(steps)}", flush=True)
-    
+    RESULT_DIR.mkdir(parents=True, exist_ok=True)
+    print(f"ROOT: {ROOT}")
+    print(f"PYTHON: {PYTHON}")
+    print(f"Total steps: {len(STEPS)}")
+
+    success_count = 0
+    fail_count = 0
     failed_steps = []
-    
-    for i, step in enumerate(steps, 1):
-        ok, missing = check_dependencies(step['depends'])
-        if not ok:
-            print(f"\n⚠️ 步骤{i}跳过（缺少依赖: {missing}）", flush=True)
-            failed_steps.append(f"步骤{i}: {step['name']}")
+
+    for idx, step in enumerate(STEPS):
+        if not (CODE_DIR / step['script']).exists():
+            print(f"\n[{idx+1}/{len(STEPS)}] SKIP {step['name']} - 脚本不存在: {step['script']}")
+            fail_count += 1
+            failed_steps.append(step['name'])
             continue
-        
-        success = run_script(f"步骤{i}: {step['name']}", step['script'])
-        if not success:
-            print(f"\n❌ 步骤{i}失败", flush=True)
-            failed_steps.append(f"步骤{i}: {step['name']}")
-    
-    print(f"\n{'='*60}", flush=True)
+        ok = run_step(idx, step)
+        if ok:
+            success_count += 1
+        else:
+            fail_count += 1
+            failed_steps.append(step['name'])
+
+    print(f"\n{'='*60}")
+    print(f"全部完成: {success_count}/{len(STEPS)} 成功")
     if failed_steps:
-        print("失败的步骤:")
-        for f in failed_steps:
-            print(f"  - {f}")
-        sys.exit(1)
-    else:
-        print("✅ 所有步骤运行成功!")
-        print(f"结果保存在: {RESULT}")
-        sys.exit(0)
+        print(f"失败步骤: {', '.join(failed_steps)}")
+    print(f"{'='*60}")
+
 
 if __name__ == '__main__':
     main()

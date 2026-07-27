@@ -1,0 +1,31 @@
+# NK-like CD8+ T cell 项目依赖
+# Conda 环境: scanpy2 (/opt/anaconda3/envs/scanpy2)
+# Python 3.10
+
+# 核心科学计算
+numpy==1.26.4
+scipy==1.13.1
+pandas==2.3.3
+
+# 单细胞分析
+anndata==0.11.4
+scanpy==1.9.3
+
+# 机器学习
+scikit-learn==1.2.2
+umap-learn>=0.5.5
+
+# 统计建模
+statsmodels>=0.14.0
+lifelines>=0.27.0
+
+# 可视化
+matplotlib==3.10.8
+seaborn>=0.12.0
+
+# 数据 IO
+openpyxl==3.1.5
+xlrd==2.0.2
+
+# 网络/图分析
+networkx==2.8.8
